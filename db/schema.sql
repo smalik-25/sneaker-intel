@@ -1,0 +1,3 @@
+-- sneaker-intel warehouse schema (star schema).
+-- Hand-written, no ORM. Defined in Phase 2: dim_shoes, fact_sales,
+-- fact_social_signals, dim_drops, with indexes and constraints.
