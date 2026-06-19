@@ -31,8 +31,8 @@ sources (eBay, Reddit, Google Trends)
 
 ## Progress
 
-- [ ] **Phase 0** — Project scaffold
-- [ ] **Phase 1** — Python ingestion layer (eBay / Reddit / Google Trends)
+- [x] **Phase 0** — Project scaffold
+- [x] **Phase 1** — Python ingestion layer (eBay / Reddit / Google Trends)
 - [ ] **Phase 2** — Database schema + raw loader (Postgres star schema)
 - [ ] **Phase 3** — dbt transformation layer (staging / intermediate / marts + tests)
 - [ ] **Phase 4** — Streamlit dashboard (Market Overview / Shoe Deep Dive / Drop Calendar)
@@ -48,11 +48,31 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. (Later phases) bring up Postgres, run ingestion, dbt, and the dashboard
+# 3. Run ingestion (writes timestamped raw JSON to data/raw/)
 make ingest
-make transform
-make dashboard
+#   ...or force Google Trends offline:  python -m ingestion.run_ingestion --stub-trends
+
+# Later phases:
+make transform   # dbt build
+make dashboard   # Streamlit app
 ```
+
+## API credentials
+
+Ingestion runs out of the box in **stub mode** — each source yields synthetic
+records so the pipeline is testable before any keys exist. To pull real data,
+copy `.env.example` to `.env` and fill in the keys below. Any client whose keys
+are missing automatically falls back to stub mode (logged as a warning).
+
+| Source | What to register | Where | Env vars |
+|---|---|---|---|
+| eBay | Join the eBay Developer Program, create an app, and use its production **App ID (Client ID)** keyset for the Finding API. | https://developer.ebay.com/ | `EBAY_APP_ID` |
+| Reddit | Create a **script**-type app to get a client ID + secret. | https://www.reddit.com/prefs/apps | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` |
+| Google Trends | No key required (pytrends scrapes the public endpoint). | — | — |
+
+> Note: eBay is steering new integrations toward the **Browse API**; the Finding
+> API still serves sold-listing data but may need migration later. `.env` is
+> gitignored — never commit real keys.
 
 ## Repo layout
 
