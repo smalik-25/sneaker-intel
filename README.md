@@ -4,7 +4,7 @@
 
 Resale price behavior is hard to reason about from screenshots: why deadstock trades at multiples of retail, how a premium decays after a drop, why two colorways of the same silhouette diverge. This project puts the data in one place so those questions are answerable. It's a personal portfolio project, built in public, with every phase documented through Conventional Commits and a running [DEVLOG](DEVLOG.md). Forecasting resale premium is a deliberate Phase 2 extension and is intentionally out of scope here; this build is the data engineering foundation underneath it.
 
-**Live demo:** not yet deployed (see [DEPLOY.md](DEPLOY.md)). &nbsp;·&nbsp; **CI:** GitHub Actions runs the full pipeline (ingest, load, dbt build and tests) on every push.
+**Live demo:** [sneaker-intel-2.streamlit.app](https://sneaker-intel-2.streamlit.app/) &nbsp;·&nbsp; **CI:** GitHub Actions runs the full pipeline (ingest, load, dbt build and tests) on every push.
 
 ## Tech stack
 
