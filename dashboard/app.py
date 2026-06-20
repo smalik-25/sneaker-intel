@@ -122,7 +122,7 @@ def market_overview() -> None:
     st.subheader("All shoes (sortable)")
     st.dataframe(
         ranked,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "search_term": "Shoe",
@@ -200,6 +200,21 @@ def shoe_deep_dive() -> None:
     else:
         st.bar_chart(by_size)
 
+    st.subheader("Search interest (Google Trends)")
+    interest = run_query(
+        f"""
+        select point_date, interest
+        from {MART_SCHEMA}.mart_search_interest
+        where search_term = :shoe
+        order by point_date
+        """,
+        {"shoe": shoe},
+    )
+    if interest.empty:
+        st.caption("No Google Trends data for this shoe (not in the live watchlist).")
+    else:
+        st.line_chart(interest.set_index("point_date")["interest"])
+
 
 # ---------------------------------------------------------------------------
 # Page 3 — Drop Calendar
@@ -230,7 +245,7 @@ def drop_calendar() -> None:
 
     st.dataframe(
         drops,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "release_date": "Released",
@@ -245,6 +260,52 @@ def drop_calendar() -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# Page 4 — About
+# ---------------------------------------------------------------------------
+def about() -> None:
+    st.header("About this project")
+    st.markdown(
+        """
+**Sneaker Resale Intelligence** is an end-to-end data engineering project that
+turns sneaker resale and demand signals into an analytical warehouse and this
+dashboard. It's a personal portfolio project, built in public.
+
+#### How it works
+
+```
+Sources → raw JSON → PostgreSQL (star schema) → dbt → marts → this dashboard
+```
+
+- **Ingestion (Python)** — typed source clients land raw JSON. The current
+  pipeline uses the **StockX** dataset (real resale sales) and **Google Trends**
+  (live search demand). eBay and Reddit clients are built and tested but parked
+  as future extensions (they need API keys).
+- **Warehouse (PostgreSQL)** — a hand-written **star schema**: a conformed
+  `dim_shoes` dimension, `dim_drops` releases, and per-source fact tables. An
+  idempotent loader bulk-loads the raw JSON.
+- **Transformations (dbt)** — staging → intermediate → marts. The premium
+  economics (premium over retail, rolling averages, ranks) are computed with
+  SQL window functions and covered by dbt tests.
+- **Dashboard (Streamlit)** — a thin reader over the dbt marts; every figure
+  here is a query against a modeled table.
+
+#### What you're looking at
+
+- **Market Overview** — shoes ranked by resale premium, with a date-window filter.
+- **Shoe Deep Dive** — a shoe's premium trajectory, size breakdown, and Google
+  Trends search interest.
+- **Drop Calendar** — release history with each shoe's realized premium.
+
+#### Notes
+
+The sales data is the **StockX 2019 dataset**, so figures reflect that era and
+catalog. Without the dataset/database the app falls back to synthetic stub data.
+Predictive modeling is a deliberate next-phase extension, not part of this build.
+"""
+    )
+
+
 def _fmt_pct(value: float | None) -> str:
     """Format a fractional premium as a percentage, tolerating NaN/None."""
     return "—" if value is None or pd.isna(value) else f"{value:.0%}"
@@ -254,12 +315,22 @@ PAGES = {
     "Market Overview": market_overview,
     "Shoe Deep Dive": shoe_deep_dive,
     "Drop Calendar": drop_calendar,
+    "About": about,
 }
 
 
 def main() -> None:
-    st.set_page_config(page_title="sneaker-intel", layout="wide")
+    st.set_page_config(page_title="Sneaker Resale Intelligence", layout="wide")
+
+    st.title("Sneaker Resale Intelligence")
+    st.caption(
+        "Resale premiums and search demand across the sneaker market — "
+        "an end-to-end data engineering project."
+    )
+    st.divider()
+
     st.sidebar.title("sneaker-intel")
+    st.sidebar.caption("Resale Intelligence Platform")
     choice = st.sidebar.radio("Page", list(PAGES))
     PAGES[choice]()
 
