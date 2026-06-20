@@ -70,6 +70,31 @@ def upsert_shoes(cur, search_terms: set[str]) -> dict[str, int]:
     return {term: key for term, key in cur.fetchall()}
 
 
+def enrich_shoes_from_stockx(cur, records: list[dict[str, Any]]) -> int:
+    """Backfill dim_shoes.brand and model_name from StockX records.
+
+    The StockX dataset carries the brand and a clean model name, so the
+    conformed dimension shouldn't be left with NULL descriptive attributes.
+    Returns the number of distinct shoes enriched.
+    """
+    seen: dict[str, tuple] = {}
+    for r in records:
+        term = r["search_term"]
+        if term not in seen:
+            seen[term] = (term, (r.get("brand") or None), (r.get("title") or term))
+    rows = list(seen.values())
+    if not rows:
+        return 0
+    execute_values(
+        cur,
+        "update dim_shoes s set brand = v.brand, model_name = v.model_name "
+        "from (values %s) as v (search_term, brand, model_name) "
+        "where s.search_term = v.search_term",
+        rows,
+    )
+    return len(rows)
+
+
 def load_sales(cur, records: list[dict[str, Any]], shoe_map: dict[str, int]) -> int:
     """Bulk-insert eBay sold listings; return the number of new rows."""
     rows = [
@@ -223,6 +248,8 @@ def load_all(dsn: str, raw_dir: Path = RAW_DIR) -> dict[str, int]:
     with psycopg2.connect(dsn) as conn:
         with conn.cursor() as cur:
             shoe_map = upsert_shoes(cur, search_terms)
+            # Backfill brand/model_name on the conformed dimension from StockX.
+            enrich_shoes_from_stockx(cur, stockx)
             # dim_drops first (StockX-derived) so premium joins have releases.
             inserted["dim_drops"] = load_drops(cur, stockx, shoe_map)
             inserted["fact_sales_ebay"] = load_sales(cur, sales, shoe_map)
