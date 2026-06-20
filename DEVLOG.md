@@ -22,6 +22,28 @@ An append-only build log for sneaker-intel. One entry per work session, newest a
 
 ---
 
+## 2026-06-19 — Phase 2: database schema + raw loader
+
+**What I built**
+- `db/schema.sql` — a hand-written star schema: `dim_shoes` (conformed dimension), `dim_drops` (release reference), and three facts, one per source: `fact_sales` (eBay), `fact_social_posts` (Reddit), `fact_search_interest` (Trends). FKs, natural-key unique constraints, check constraints, and indexes on every FK + time column.
+- `db/seeds.sql` — upserts brand/silhouette/colorway onto the watchlist shoes and seeds representative release data into `dim_drops`.
+- `db/load_raw.py` — reads `data/raw/`, upserts `dim_shoes` from the search terms it finds, then bulk-loads each source with `execute_values` and `ON CONFLICT DO NOTHING`. Idempotent by construction.
+- `docker-compose.yml` (Postgres 16), Makefile targets (`db-up`, `db-down`, `db-init`, `load`), `DATABASE_URL` in `.env.example`, and `docs/erd.md` with a mermaid ERD plus the design reasoning.
+- `tests/test_load_raw.py` — three tests covering the full read→transform→insert wiring against a faked cursor (row counts, column widths, empty-dir).
+
+**Why I made these decisions**
+- **Two social fact tables, not one.** Reddit is per-post and Trends is per-day — different grains. Splitting into `fact_social_posts` and `fact_search_interest` keeps every row meaningful instead of unioning mismatched grains with a column of NULLs.
+- **`search_term` as the natural key on `dim_shoes`, surrogate `shoe_key` as the FK.** Raw records only know their ingestion term, so that's the reliable join key; the serial surrogate lets descriptive attributes change without rewriting fact rows.
+- **Idempotency lives in the schema, not the loader.** Each fact has a natural-key unique constraint (`source_item_id`, `source_post_id`, `(shoe_key, point_date, geo)`), so `ON CONFLICT DO NOTHING` makes re-running the loader a no-op. That's the property I'd want before ever scheduling ingestion.
+- **`execute_values` over row-by-row inserts** — one round trip per source instead of N, the standard psycopg2 bulk pattern.
+- **`dim_drops` seeded by hand** because no drops source exists yet; `release_type` is constrained to `general/limited/collab` so Phase 3 has a real `accepted_values` test to run.
+
+**What I learned / got stuck on**
+- Couldn't stand up a real Postgres in this environment (aarch64, no root), so I validated the loader's Python wiring against a fake cursor and will run the live load via Docker. The 10-test suite passes and ruff is clean.
+
+**Next up**
+- Run the real load locally (`make db-up && make db-init && make load`) and confirm row counts, then start Phase 3: dbt staging/intermediate/mart models with window functions and tests.
+
 ## 2026-06-19 — Phase 1: Python ingestion layer
 
 **What I built**
