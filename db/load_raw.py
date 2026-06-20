@@ -111,18 +111,21 @@ def load_stockx_sales(
 
 
 def _insert_sales(cur, rows: list[tuple]) -> int:
-    """Shared fact_sales insert for any source."""
+    """Shared fact_sales insert for any source. Returns rows actually inserted."""
     if not rows:
         return 0
-    execute_values(
+    # fetch=True + RETURNING gives an accurate count across all pages;
+    # cur.rowcount alone only reflects execute_values' final page.
+    inserted = execute_values(
         cur,
         "insert into fact_sales "
         "(shoe_key, source, source_item_id, title, sold_price, currency, "
         "sold_date, condition, size) values %s "
-        "on conflict (source_item_id) do nothing",
+        "on conflict (source_item_id) do nothing returning 1",
         rows,
+        fetch=True,
     )
-    return cur.rowcount
+    return len(inserted)
 
 
 def load_drops(cur, records: list[dict[str, Any]], shoe_map: dict[str, int]) -> int:
@@ -141,13 +144,14 @@ def load_drops(cur, records: list[dict[str, Any]], shoe_map: dict[str, int]) -> 
     rows = list(seen.values())
     if not rows:
         return 0
-    execute_values(
+    inserted = execute_values(
         cur,
         "insert into dim_drops (shoe_key, release_date, retail_price, release_type) "
-        "values %s on conflict (shoe_key, release_date) do nothing",
+        "values %s on conflict (shoe_key, release_date) do nothing returning 1",
         rows,
+        fetch=True,
     )
-    return cur.rowcount
+    return len(inserted)
 
 
 def load_social_posts(
@@ -168,14 +172,15 @@ def load_social_posts(
     ]
     if not rows:
         return 0
-    execute_values(
+    inserted = execute_values(
         cur,
         "insert into fact_social_posts "
         "(shoe_key, source_post_id, subreddit, title, score, num_comments, "
-        "created_utc) values %s on conflict (source_post_id) do nothing",
+        "created_utc) values %s on conflict (source_post_id) do nothing returning 1",
         rows,
+        fetch=True,
     )
-    return cur.rowcount
+    return len(inserted)
 
 
 def load_search_interest(
@@ -193,13 +198,14 @@ def load_search_interest(
     ]
     if not rows:
         return 0
-    execute_values(
+    inserted = execute_values(
         cur,
         "insert into fact_search_interest (shoe_key, point_date, interest, geo) "
-        "values %s on conflict (shoe_key, point_date, geo) do nothing",
+        "values %s on conflict (shoe_key, point_date, geo) do nothing returning 1",
         rows,
+        fetch=True,
     )
-    return cur.rowcount
+    return len(inserted)
 
 
 def load_all(dsn: str, raw_dir: Path = RAW_DIR) -> dict[str, int]:

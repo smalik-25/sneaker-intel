@@ -59,11 +59,16 @@ class FakeConn:
 def _patch_db(monkeypatch) -> FakeCursor:
     cur = FakeCursor()
 
-    def fake_execute_values(cursor, sql, rows):
-        cursor.ev_calls.append((sql, list(rows)))
+    def fake_execute_values(cursor, sql, rows, fetch=False, **kwargs):
+        rows = list(rows)
+        cursor.ev_calls.append((sql, rows))
         cursor.rowcount = len(rows)
         if "dim_shoes" in sql:
             cursor._shoes = sorted({r[0] for r in rows})
+        # Loaders use fetch=True + RETURNING; emulate one returned row per insert.
+        if fetch:
+            return [(1,) for _ in rows]
+        return None
 
     monkeypatch.setattr(lr, "execute_values", fake_execute_values)
     monkeypatch.setattr(lr.psycopg2, "connect", lambda dsn: FakeConn(cur))
