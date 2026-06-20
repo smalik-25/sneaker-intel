@@ -44,17 +44,24 @@ Community Cloud + Neon is a free split option.
 ## Option B: Streamlit Community Cloud + Neon (free)
 
 1. **Create a free Postgres at https://neon.tech** and copy its connection
-   string (enable "pooled connection"; append `?sslmode=require`).
-2. **Seed it from your machine**, exactly as in Railway step 3 (use the Neon URL
-   for `DATABASE_URL` and the matching `DBT_PG_*` values).
-3. **Deploy the app at https://share.streamlit.io**: New app → pick this repo →
+   string (it already ends in `?sslmode=require`).
+2. **Seed it from your machine** with one command. With the venv active and the
+   StockX CSV in `data/external/`:
+   ```bash
+   export DATABASE_URL="postgresql://...neon...?sslmode=require"
+   make seed-remote
+   ```
+   This applies the schema and seeds, runs ingestion and the loader, and builds
+   the dbt models and tests against Neon. `scripts/seed_remote.py` derives the
+   `DBT_PG_*` settings from `DATABASE_URL`, so there's nothing else to set.
+3. **Deploy the app at https://share.streamlit.io**: New app, pick this repo,
    main file path `dashboard/app.py`.
 4. **Add secrets** (app → Settings → Secrets), in TOML:
    ```toml
    DATABASE_URL = "postgresql://...neon...?sslmode=require"
    DBT_PG_SCHEMA = "analytics"
    ```
-   Streamlit exposes these as environment variables, which `app.py` reads.
+   `app.py` reads these from the environment, falling back to Streamlit secrets.
 5. Launch and copy the public URL into the README.
 
 ---

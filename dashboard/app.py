@@ -30,14 +30,30 @@ try:
 except ImportError:
     pass
 
-MART_SCHEMA = os.getenv("DBT_PG_SCHEMA", "analytics")
+def _setting(key: str, default: str | None = None) -> str | None:
+    """Read a setting from the environment, falling back to Streamlit secrets.
+
+    Locally the value comes from .env / the environment; on Streamlit Community
+    Cloud it comes from the app's Secrets. Accessing st.secrets with no secrets
+    file raises, so the lookup is guarded.
+    """
+    value = os.getenv(key)
+    if value:
+        return value
+    try:
+        return st.secrets[key]
+    except Exception:
+        return default
+
+
+MART_SCHEMA = _setting("DBT_PG_SCHEMA", "analytics")
 RAW_SCHEMA = "public"
 
 
 @st.cache_resource
 def get_engine() -> Engine:
     """Build a cached SQLAlchemy engine from DATABASE_URL."""
-    dsn = os.getenv("DATABASE_URL")
+    dsn = _setting("DATABASE_URL")
     if not dsn:
         st.error(
             "DATABASE_URL is not set. Copy .env.example to .env (and make sure "

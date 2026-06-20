@@ -6,6 +6,7 @@ help:
 	@echo "  db-up      Start the local Postgres container (docker compose)"
 	@echo "  db-down    Stop the local Postgres container"
 	@echo "  db-init    Apply schema.sql then seeds.sql to the database"
+	@echo "  seed-remote  Seed a managed Postgres (DATABASE_URL) for deployment"
 	@echo "  ingest     Run the ingestion layer (writes raw JSON to data/raw/)"
 	@echo "  load       Load raw JSON into Postgres"
 	@echo "  transform  Run dbt build (models + tests)"
@@ -26,6 +27,11 @@ db-down:
 db-init:
 	docker compose exec -T postgres psql -U sneaker -d sneaker_intel -v ON_ERROR_STOP=1 < db/schema.sql
 	docker compose exec -T postgres psql -U sneaker -d sneaker_intel -v ON_ERROR_STOP=1 < db/seeds.sql
+
+# One-time seed of a remote (managed) Postgres from DATABASE_URL: schema +
+# seeds + ingest + load + dbt build. Used before deploying. See DEPLOY.md.
+seed-remote:
+	python scripts/seed_remote.py
 
 ingest:
 	python -m ingestion.run_ingestion
