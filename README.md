@@ -76,14 +76,14 @@ records) so the pipeline, tests, and CI work before you download anything.
 
 ### StockX dataset
 
-Download `StockX-Data-Contest.csv` from
-[Kaggle](https://www.kaggle.com/datasets/hudsonstuck/stockx-data-contest) and
-drop it at `data/external/StockX-Data-Contest.csv` (gitignored), or point
-`STOCKX_CSV_PATH` elsewhere. It ingests **every shoe in the dataset**, and its
-top-N most-sold shoes become the **watchlist** Google Trends queries, so search
-demand joins to the same `dim_shoes` rows as sales. Tune N with
-`SNEAKER_INTEL_WATCHLIST_SIZE` (default 15); without the CSV, a curated default
-watchlist is used.
+The dataset ships with the repo at `data/external/StockX-Data-Contest.csv`
+(~99K sales), sourced from [Kaggle](https://www.kaggle.com/datasets/hudsonstuck/stockx-data-contest)
+and originally released by StockX for their 2019 Data Contest. Point
+`STOCKX_CSV_PATH` elsewhere to use a different file. It ingests **every shoe in
+the dataset**, and its top-N most-sold shoes become the **watchlist** Google
+Trends queries, so search demand joins to the same `dim_shoes` rows as sales.
+Tune N with `SNEAKER_INTEL_WATCHLIST_SIZE` (default 15); without the CSV, a
+curated default watchlist is used.
 
 ## Roadmap / future extensions
 
