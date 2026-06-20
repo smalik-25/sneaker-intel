@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: mart_shoe_performance
+    description: >
+      One row per shoe summarizing resale economics over all observed sales:
+      average sold price, average / median / peak premium over retail, and
+      premium volatility (population standard deviation of pct_premium).
+      Answers "which shoes carry the highest and most volatile premium?"
+    columns:
+      - name: shoe_key
+        description: "Shoe surrogate key."
+        data_tests: [not_null, unique]
+      - name: search_term
+        data_tests: [not_null]
+      - name: sales_count
+        description: "Number of sales aggregated for this shoe."
+        data_tests: [not_null]
+
+  - name: mart_price_trajectory
+    description: >
+      One row per sale enriched with windowed context: a rolling 7-day average
+      premium, the sale's premium rank within its shoe, and the premium change
+      versus the shoe's previous sale. Answers "how does a shoe's premium move
+      sale-over-sale?"
+    columns:
+      - name: sale_key
+        description: "Sale surrogate key."
+        data_tests: [not_null, unique]
+      - name: shoe_key
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_shoes')
+              field: shoe_key
+      - name: premium_rank_in_shoe
+        description: "1 = highest premium sale for the shoe."
+        data_tests: [not_null]

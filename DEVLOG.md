@@ -22,6 +22,28 @@ An append-only build log for sneaker-intel. One entry per work session, newest a
 
 ---
 
+## 2026-06-19 — Phase 3: dbt transformation layer
+
+**What I built**
+- A dbt project (`dbt_project/`) with the postgres adapter and an in-repo, env-var-driven `profiles.yml` (defaults to the docker-compose Postgres), so the whole thing is self-contained.
+- **Staging** (views), one model per source table — `stg_shoes`, `stg_drops`, `stg_sales`, `stg_social_posts`, `stg_search_interest` — casting/cleaning, normalizing names, defaulting nulls.
+- **Intermediate** `int_sales_enriched` (view): joins sales to the shoe and its primary release, computing `days_since_release`, `absolute_premium`, and `pct_premium`.
+- **Marts** (tables): `mart_shoe_performance` (avg / median via `percentile_cont` / peak premium + volatility via `stddev_pop`, per shoe) and `mart_price_trajectory` (per-sale rolling 7-day avg premium with `AVG() OVER`, `RANK() OVER` within shoe, and period-over-period delta with `LAG()`).
+- Tests: `not_null`/`unique` on every key, `relationships` from each fact staging model and the trajectory mart back to `stg_shoes`, and `accepted_values` on `release_type`. Marts carry descriptions documenting the question each answers.
+
+**Why I made these decisions**
+- **Staging/intermediate as views, marts as tables.** Staging and intermediate are cheap pass-throughs that should always reflect current raw data; marts are what the dashboard hits, so materializing them as tables keeps reads fast.
+- **`int_sales_enriched` as a separate layer.** The premium math (absolute and pct) is computed once, in one place, so both marts — and any future model — share an identical definition instead of redefining it.
+- **`distinct on (shoe_key)` for the primary drop.** A shoe can have multiple releases; I pick the earliest as the reference release for premium, rather than fanning sales out across every drop.
+- **A dedicated `analytics` schema** keeps modeled tables cleanly separated from the raw `public` tables the loader writes.
+- **`nullif(retail_price, 0)`** guards the pct_premium division so a bad/zero retail never throws.
+
+**What I learned / got stuck on**
+- Validated structurally with `dbt parse` (refs, sources, Jinja, YAML all resolve). I couldn't run `dbt build` here (no local Postgres in this environment), so the model SQL gets its real exercise when run against the Docker database — `make transform` runs build + tests in one shot.
+
+**Next up**
+- Run `make transform` locally to build the models and confirm tests pass, then Phase 4: the Streamlit dashboard reading from these marts.
+
 ## 2026-06-19 — Phase 2: database schema + raw loader
 
 **What I built**

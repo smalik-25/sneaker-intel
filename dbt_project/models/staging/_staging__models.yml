@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: stg_shoes
+    description: "One clean row per tracked shoe (conformed dimension)."
+    columns:
+      - name: shoe_key
+        description: "Surrogate key for the shoe."
+        data_tests: [not_null, unique]
+      - name: search_term
+        description: "Natural key from ingestion."
+        data_tests: [not_null, unique]
+
+  - name: stg_drops
+    description: "Release reference data per shoe."
+    columns:
+      - name: drop_key
+        data_tests: [not_null, unique]
+      - name: shoe_key
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_shoes')
+              field: shoe_key
+      - name: release_type
+        description: "Release category."
+        data_tests:
+          - accepted_values:
+              values: ["general", "limited", "collab"]
+
+  - name: stg_sales
+    description: "Clean eBay sold listings, one row per listing."
+    columns:
+      - name: sale_key
+        data_tests: [not_null, unique]
+      - name: source_item_id
+        data_tests: [not_null, unique]
+      - name: shoe_key
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_shoes')
+              field: shoe_key
+      - name: sold_price
+        data_tests: [not_null]
+
+  - name: stg_social_posts
+    description: "Clean Reddit posts, one row per post."
+    columns:
+      - name: post_key
+        data_tests: [not_null, unique]
+      - name: source_post_id
+        data_tests: [not_null, unique]
+      - name: shoe_key
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_shoes')
+              field: shoe_key
+
+  - name: stg_search_interest
+    description: "Google Trends interest, one row per shoe-day."
+    columns:
+      - name: interest_key
+        data_tests: [not_null, unique]
+      - name: shoe_key
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_shoes')
+              field: shoe_key
+      - name: interest
+        data_tests: [not_null]

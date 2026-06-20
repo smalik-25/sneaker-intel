@@ -1,0 +1,16 @@
+# In-repo profile so the project is self-contained. Run dbt with
+# DBT_PROFILES_DIR set to this folder (the `make transform` target does this).
+# All values default to the docker-compose Postgres; override via env vars.
+# These are LOCAL DEV defaults only — never put production secrets here.
+sneaker_intel:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_PG_HOST', 'localhost') }}"
+      port: "{{ env_var('DBT_PG_PORT', '5432') | int }}"
+      user: "{{ env_var('DBT_PG_USER', 'sneaker') }}"
+      password: "{{ env_var('DBT_PG_PASSWORD', 'sneaker') }}"
+      dbname: "{{ env_var('DBT_PG_DBNAME', 'sneaker_intel') }}"
+      schema: "{{ env_var('DBT_PG_SCHEMA', 'analytics') }}"
+      threads: 4

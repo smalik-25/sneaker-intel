@@ -34,7 +34,7 @@ load:
 	python -m db.load_raw
 
 transform:
-	cd dbt_project && dbt build
+	cd dbt_project && DBT_PROFILES_DIR=. dbt build
 
 test:
 	pytest
