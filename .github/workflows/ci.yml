@@ -6,17 +6,55 @@ on:
   pull_request:
 
 jobs:
-  lint-and-test:
+  lint-test-pipeline:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sneaker
+          POSTGRES_PASSWORD: sneaker
+          POSTGRES_DB: sneaker_intel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sneaker -d sneaker_intel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Matches the docker-compose / profiles.yml defaults.
+      DATABASE_URL: postgresql://sneaker:sneaker@localhost:5432/sneaker_intel
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Lint
+
+      - name: Lint (ruff)
         run: ruff check .
-      - name: Test
-        run: pytest
-  # dbt test on every push to main is wired up in Phase 5.
+
+      - name: Unit tests (pytest)
+        run: pytest -q
+
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Apply schema + seeds
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/schema.sql -f db/seeds.sql
+
+      - name: Ingest (stub) and load raw
+        run: |
+          python -m ingestion.run_ingestion --stub-trends
+          python -m db.load_raw
+
+      - name: dbt build (models + data tests)
+        run: cd dbt_project && DBT_PROFILES_DIR=. dbt build

@@ -4,6 +4,8 @@
 
 This is a personal portfolio project, built in public. Every phase is documented through Conventional Commits and a running [DEVLOG](DEVLOG.md). Predictive modeling / ML is a deliberate **Phase 2** extension and is intentionally out of scope for this build — the focus here is the data engineering foundation.
 
+**Live demo:** _not yet deployed — see [DEPLOY.md](DEPLOY.md)._ &nbsp;·&nbsp; **CI:** GitHub Actions runs the full pipeline (ingest → load → dbt build + tests) on every push.
+
 ## Tech stack
 
 | Layer | Tooling |
@@ -11,22 +13,19 @@ This is a personal portfolio project, built in public. Every phase is documented
 | Ingestion | Python (dataclasses, type hints), `requests`, `praw`, `pytrends` |
 | Storage | PostgreSQL (hand-written star schema, no ORM), `psycopg2` |
 | Transformation | dbt-core + dbt-postgres (staging / intermediate / marts) |
-| Dashboard | Streamlit + pandas |
-| Deployment | Docker, Makefile, GitHub Actions (CI), Railway/Render |
+| Dashboard | Streamlit + pandas + SQLAlchemy |
+| Deployment | Docker, Makefile, GitHub Actions (CI), Railway / Streamlit Cloud |
 
-## Architecture (high level)
+## Architecture
 
-```
-sources (eBay, Reddit, Google Trends)
-        │  ingestion/  → raw JSON in data/raw/
-        ▼
-   PostgreSQL  (db/schema.sql — star schema)
-        │  load_raw.py (bulk load)
-        ▼
-       dbt   (staging → intermediate → marts)
-        │
-        ▼
-   Streamlit dashboard
+```mermaid
+flowchart TD
+    A["Sources<br/>eBay · Reddit · Google Trends"] -->|ingestion/| B["Raw JSON<br/>data/raw/"]
+    B -->|db/load_raw.py · execute_values| C[("PostgreSQL<br/>star schema")]
+    C -->|dbt staging| D["stg_* views"]
+    D -->|dbt intermediate| E["int_sales_enriched<br/>premium economics"]
+    E -->|dbt marts| F["mart_shoe_performance<br/>mart_price_trajectory"]
+    F --> G["Streamlit dashboard"]
 ```
 
 ## Progress
@@ -36,26 +35,32 @@ sources (eBay, Reddit, Google Trends)
 - [x] **Phase 2** — Database schema + raw loader (Postgres star schema)
 - [x] **Phase 3** — dbt transformation layer (staging / intermediate / marts + tests)
 - [x] **Phase 4** — Streamlit dashboard (Market Overview / Shoe Deep Dive / Drop Calendar)
-- [ ] **Phase 5** — Deployment & polish (Docker, Makefile, CI, live URL, README finalize)
+- [x] **Phase 5** — Deployment & polish (Docker, Makefile, CI, deploy guide, README finalize)
 
 ## Run locally
 
+Requires Docker (for Postgres) and Python 3.10+.
+
 ```bash
-# 1. Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-
-# 2. Install dependencies
+# 1. Environment
+python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env
 
-# 3. Run ingestion (writes timestamped raw JSON to data/raw/)
-make ingest
-#   ...or force Google Trends offline:  python -m ingestion.run_ingestion --stub-trends
+# 2. Database
+make db-up        # start Postgres 16 (Docker)
+make db-init      # apply schema.sql + seeds.sql
 
-# Later phases:
-make transform   # dbt build
-make dashboard   # Streamlit app
+# 3. Pipeline
+make ingest       # fetch sources -> raw JSON in data/raw/ (stub mode without API keys)
+make load         # bulk-load raw JSON into Postgres
+make transform    # dbt build: models + data tests
+
+# 4. Dashboard
+make dashboard    # Streamlit at http://localhost:8501
 ```
+
+Run `make help` for all targets. To deploy a live instance, see [DEPLOY.md](DEPLOY.md).
 
 ## API credentials
 
@@ -87,5 +92,40 @@ sneaker-intel/
 ├── tests/            # pytest suite
 ├── .github/workflows # CI
 ├── DEVLOG.md         # append-only build log
-├── Makefile  Dockerfile  requirements.txt  pyproject.toml
+├── Makefile  Dockerfile  docker-compose.yml  requirements.txt  pyproject.toml
 ```
+
+## Decisions & tradeoffs
+
+**Star schema, hand-written, no ORM.** The warehouse is read-heavy and
+analytical, so a star schema (conformed `dim_shoes` + per-source facts) keeps
+analytical queries to a single dimension join and matches what dbt and BI tools
+expect. Writing the DDL by hand keeps the constraints and indexes explicit and
+interview-explainable. See [docs/erd.md](docs/erd.md).
+
+**Two social fact tables instead of one.** Reddit is per-post and Google Trends
+is per-day — different grains. Splitting them (`fact_social_posts`,
+`fact_search_interest`) keeps every row meaningful rather than unioning
+mismatched grains behind a wall of NULLs.
+
+**Idempotency in the schema, not the loader.** Each fact carries a natural-key
+unique constraint and the loader inserts `ON CONFLICT DO NOTHING`, so re-running
+ingestion is a safe no-op — the property you want before automating it.
+
+**Window functions over correlated subqueries.** The price-trajectory mart uses
+`AVG() OVER` (rolling 7-day premium), `RANK() OVER`, and `LAG()`. These compute
+in a single pass over each shoe's partition, where the subquery equivalents
+would re-scan per row — clearer and faster.
+
+**A thin dashboard.** Every figure the Streamlit app shows is a query against a
+dbt mart, not pandas transformation. Modeling logic stays in dbt where it's
+tested; the app only queries and presents.
+
+**Stub mode by default.** Sources without credentials yield deterministic
+synthetic records, so the whole pipeline (and the test suite, and CI) runs end
+to end before any API keys exist.
+
+**Why no ML yet.** Predictive modeling is a deliberate Phase 2 extension. This
+build is scoped to the data engineering foundation — reliable ingestion, a clean
+modeled warehouse, tests, and a dashboard — which is the prerequisite any
+forecasting work would sit on top of.

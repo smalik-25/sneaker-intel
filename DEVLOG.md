@@ -22,6 +22,26 @@ An append-only build log for sneaker-intel. One entry per work session, newest a
 
 ---
 
+## 2026-06-19 — Phase 5: deployment, CI & polish
+
+**What I built**
+- **GitHub Actions CI** that runs the *entire* pipeline on every push/PR: spins up a Postgres service, applies schema + seeds, runs ingestion (stub) → load → `dbt build` (models + data tests), plus ruff and pytest. Self-contained, no secrets.
+- **Production Dockerfile** for the dashboard: dependency-layer caching, non-root user, and binding to the platform `$PORT` so it runs on Railway/Render unchanged. Added a `.dockerignore`.
+- **`DEPLOY.md`** — step-by-step deploy guides for Railway (app + managed Postgres) and Streamlit Community Cloud + Neon (free), including how to seed the cloud database and refresh data later.
+- **Finalized the README**: a mermaid architecture diagram, a complete local run sequence (`db-up → db-init → ingest → load → transform → dashboard`), a CI/live-demo line, and a "Decisions & tradeoffs" section pulled from this log.
+
+**Why I made these decisions**
+- **Full-pipeline CI over lint-only.** Running ingest→load→dbt build against a real Postgres service is the strongest signal that the project actually works — it exercises the SQL, the constraints, and every dbt test on each push, not just the Python.
+- **Deferred the live deploy behind a guide.** A live dashboard needs a cloud Postgres seeded with the marts; that depends on my hosting accounts and is better done deliberately than rushed. The Dockerfile + DEPLOY.md make it a short, documented step rather than a mystery.
+- **`$PORT`-aware container** so the same image runs locally and on a PaaS without edits.
+
+**What I learned / got stuck on**
+- The whole build ran on a "Claude prepares, I run git on the Mac" workflow because the sandbox couldn't manage git locks on the mounted drive — worth remembering for future projects.
+- Validated everything reachable without a live DB: ruff clean, 10 pytests pass, both workflow and compose YAML parse, dbt parses. CI will be the first place the full pipeline runs unattended.
+
+**Next up (Phase 2 / future)**
+- Register real eBay + Reddit keys and run against live data. Then the deliberate ML extension: forecasting resale premium from the sales + social + search features this warehouse already models.
+
 ## 2026-06-19 — Phase 4: Streamlit dashboard
 
 **What I built**
