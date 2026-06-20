@@ -22,6 +22,28 @@ An append-only build log for sneaker-intel. One entry per work session, newest a
 
 ---
 
+## 2026-06-19 — Phase 4: Streamlit dashboard
+
+**What I built**
+- `dashboard/app.py` — a three-page Streamlit app reading from the marts:
+  - **Market Overview**: headline KPIs from `mart_shoe_performance`, plus a sale-date-window slider that re-ranks shoes by average premium (with peak and volatility) from `mart_price_trajectory`.
+  - **Shoe Deep Dive**: a per-shoe premium trajectory line chart (raw `pct_premium` vs the rolling 7-day average), a recent-7-day-vs-90-day-baseline metric, and a premium-by-size bar chart.
+  - **Drop Calendar**: release history from `dim_drops` joined to each shoe's premium context from `mart_shoe_performance`.
+- Added `size`, `brand`, and `silhouette` to `mart_price_trajectory` so the dashboard reads them directly instead of doing joins itself.
+- Cached the SQLAlchemy engine (`st.cache_resource`) and every query (`st.cache_data`, 5-min TTL); added `sqlalchemy` to requirements.
+
+**Why I made these decisions**
+- **The app stays thin.** Every aggregation it shows is a `GROUP BY`/window query against a mart, not pandas transformation — the heavy logic stays in dbt where it's tested. The one bit of in-app math (recent-vs-baseline) is presentation glue, not modeling.
+- **All-time KPIs + a date-window slider** rather than a hardcoded "this month": full range is the default (so it reads as all-time) but you can scope to any window. More useful and the stub data is sparse month-to-month.
+- **Drop Calendar shows release history, not "upcoming"** — the seeded drops are past-dated, so an upcoming-only calendar would be empty. Pairing each release with its realized premium is the more honest view of the data we have.
+- **Connection + schema from env** (`DATABASE_URL`, `DBT_PG_SCHEMA`), matching dbt and the loader, so there's one source of truth for where data lives.
+
+**What I learned / got stuck on**
+- Validated `app.py` by import (pages register, no syntax/ruff issues) and re-ran `dbt parse` for the mart change; the live render happens via `make transform && make dashboard` against Docker Postgres. Couldn't run the Streamlit server itself in this environment.
+
+**Next up**
+- Phase 5: Dockerfile for the dashboard, GitHub Actions CI running dbt tests, deploy to a live URL, and finalize the README with an architecture diagram and a decisions/tradeoffs section.
+
 ## 2026-06-19 — Phase 3: dbt transformation layer
 
 **What I built**

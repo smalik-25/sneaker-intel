@@ -35,7 +35,7 @@ sources (eBay, Reddit, Google Trends)
 - [x] **Phase 1** — Python ingestion layer (eBay / Reddit / Google Trends)
 - [x] **Phase 2** — Database schema + raw loader (Postgres star schema)
 - [x] **Phase 3** — dbt transformation layer (staging / intermediate / marts + tests)
-- [ ] **Phase 4** — Streamlit dashboard (Market Overview / Shoe Deep Dive / Drop Calendar)
+- [x] **Phase 4** — Streamlit dashboard (Market Overview / Shoe Deep Dive / Drop Calendar)
 - [ ] **Phase 5** — Deployment & polish (Docker, Makefile, CI, live URL, README finalize)
 
 ## Run locally
