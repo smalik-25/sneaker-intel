@@ -75,6 +75,7 @@ def test_load_all_inserts_every_record(tmp_path, monkeypatch) -> None:
         watchlist=["Air Jordan 1", "Yeezy 350"],
         subreddits=["sneakers"],
         raw_dir=tmp_path,
+        stockx_csv_path=tmp_path / "missing.csv",  # force StockX stub mode
     )
     run(settings, stub_trends=True)  # land raw JSON in tmp_path
 
@@ -92,7 +93,12 @@ def test_load_all_inserts_every_record(tmp_path, monkeypatch) -> None:
 
 
 def test_load_all_builds_correct_row_widths(tmp_path, monkeypatch) -> None:
-    settings = Settings(watchlist=["Air Jordan 1"], subreddits=["sneakers"], raw_dir=tmp_path)
+    settings = Settings(
+        watchlist=["Air Jordan 1"],
+        subreddits=["sneakers"],
+        raw_dir=tmp_path,
+        stockx_csv_path=tmp_path / "missing.csv",  # force StockX stub mode
+    )
     run(settings, stub_trends=True)
 
     cur = _patch_db(monkeypatch)

@@ -72,6 +72,7 @@ def test_run_writes_trends_per_term_plus_stockx(tmp_path) -> None:
         watchlist=["Air Jordan 1", "Yeezy 350"],
         subreddits=["sneakers"],
         raw_dir=tmp_path,
+        stockx_csv_path=tmp_path / "missing.csv",  # force StockX stub mode
     )
     written = run(settings, stub_trends=True)
     # Current pipeline: 1 Trends file per term + 1 StockX dataset file.
