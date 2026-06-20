@@ -1,7 +1,7 @@
 # Build-in-public posts
 
 Short writeups drafted from the [DEVLOG](../../DEVLOG.md), one per milestone.
-Roughly 400 words each, first person — usable as personal-site blog posts or
+Roughly 400 words each, first person. Usable as personal-site blog posts or as
 talking points for the project.
 
 1. [Building a data engineering project in public](01-building-in-public.md)

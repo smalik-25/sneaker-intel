@@ -16,7 +16,7 @@ Community Cloud + Neon is a free split option.
 - A local virtualenv with `requirements.txt` installed (used to seed the cloud
   database once).
 
-## Option A — Railway (app + managed Postgres)
+## Option A: Railway (app + managed Postgres)
 
 1. Create an account at https://railway.app and a new project.
 2. **Add a Postgres database**: New → Database → PostgreSQL. Copy its connection
@@ -41,7 +41,7 @@ Community Cloud + Neon is a free split option.
    automatically; the Dockerfile already honors it.
 6. Open the generated public URL. Put it in the README's live-demo line.
 
-## Option B — Streamlit Community Cloud + Neon (free)
+## Option B: Streamlit Community Cloud + Neon (free)
 
 1. **Create a free Postgres at https://neon.tech** and copy its connection
    string (enable "pooled connection"; append `?sslmode=require`).

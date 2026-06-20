@@ -1,13 +1,13 @@
 """Streamlit dashboard for sneaker-intel.
 
 A thin reader over the dbt mart tables: it queries marts and hands DataFrames to
-Streamlit charts/tables. All transformation logic lives in dbt — this app does
+Streamlit charts/tables. All transformation logic lives in dbt: this app does
 querying and presentation only.
 
 Pages:
-  1. Market Overview  — KPIs + date-windowed ranking of shoes by resale premium.
-  2. Shoe Deep Dive   — price trajectory, size breakdown, recent-vs-baseline.
-  3. Drop Calendar    — release history with each shoe's premium context.
+  1. Market Overview : KPIs + date-windowed ranking of shoes by resale premium.
+  2. Shoe Deep Dive  : price trajectory, size breakdown, recent-vs-baseline.
+  3. Drop Calendar   : release history with each shoe's premium context.
 
 Run with: ``streamlit run dashboard/app.py`` (or ``make dashboard``). Reads the
 connection from DATABASE_URL and the mart schema from DBT_PG_SCHEMA (default
@@ -55,7 +55,7 @@ def run_query(sql: str, params: dict | None = None) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# Page 1 — Market Overview
+# Page 1: Market Overview
 # ---------------------------------------------------------------------------
 def market_overview() -> None:
     st.header("Market Overview")
@@ -135,7 +135,7 @@ def market_overview() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Page 2 — Shoe Deep Dive
+# Page 2: Shoe Deep Dive
 # ---------------------------------------------------------------------------
 def shoe_deep_dive() -> None:
     st.header("Shoe Deep Dive")
@@ -217,7 +217,7 @@ def shoe_deep_dive() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Page 3 — Drop Calendar
+# Page 3: Drop Calendar
 # ---------------------------------------------------------------------------
 def drop_calendar() -> None:
     st.header("Drop Calendar")
@@ -261,54 +261,57 @@ def drop_calendar() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Page 4 — About
+# Page 4: About
 # ---------------------------------------------------------------------------
 def about() -> None:
     st.header("About this project")
     st.markdown(
         """
-**Sneaker Resale Intelligence** is an end-to-end data engineering project that
-turns sneaker resale and demand signals into an analytical warehouse and this
-dashboard. It's a personal portfolio project, built in public.
+I built **Sneaker Resale Intelligence** because resale price behavior is hard to
+reason about from screenshots. Why a pair that retailed at $220 trades at
+multiples of that, how the premium decays after a drop, why two colorways of the
+same silhouette diverge. To see any of that clearly you need the data in one
+place, modeled properly. This is that, end to end, built in public as a data
+engineering portfolio project.
 
 #### How it works
 
 ```
-Sources → raw JSON → PostgreSQL (star schema) → dbt → marts → this dashboard
+sources  ->  raw JSON  ->  PostgreSQL (star schema)  ->  dbt  ->  marts  ->  this dashboard
 ```
 
-- **Ingestion (Python)** — typed source clients land raw JSON. The current
-  pipeline uses the **StockX** dataset (real resale sales) and **Google Trends**
-  (live search demand). eBay and Reddit clients are built and tested but parked
-  as future extensions (they need API keys).
-- **Warehouse (PostgreSQL)** — a hand-written **star schema**: a conformed
-  `dim_shoes` dimension, `dim_drops` releases, and per-source fact tables. An
-  idempotent loader bulk-loads the raw JSON.
-- **Transformations (dbt)** — staging → intermediate → marts. The premium
-  economics (premium over retail, rolling averages, ranks) are computed with
-  SQL window functions and covered by dbt tests.
-- **Dashboard (Streamlit)** — a thin reader over the dbt marts; every figure
-  here is a query against a modeled table.
+The pipeline pulls two real, key-free sources: the **StockX 2019 dataset** for
+actual resale sales, and **Google Trends** for live search demand. Typed Python
+clients land raw JSON, an idempotent loader bulk-loads it into a hand-written
+**star schema** in PostgreSQL, and **dbt** transforms it across staging,
+intermediate, and mart layers. The premium economics (premium over retail,
+rolling averages, rank within a shoe) are computed with SQL window functions and
+covered by dbt tests. This dashboard is a thin reader over the marts: every
+number on it is a query against a modeled table, not math done in the app.
 
-#### What you're looking at
+The eBay and Reddit API clients are built and tested but parked as future
+extensions, since they need keys. The schema and loader already support them.
 
-- **Market Overview** — shoes ranked by resale premium, with a date-window filter.
-- **Shoe Deep Dive** — a shoe's premium trajectory, size breakdown, and Google
-  Trends search interest.
-- **Drop Calendar** — release history with each shoe's realized premium.
+#### The three views
+
+- **Market Overview** ranks shoes by resale premium, with a date-window filter.
+- **Shoe Deep Dive** shows a shoe's premium trajectory, how premium varies across
+  sizes, and its Google Trends interest over time.
+- **Drop Calendar** pairs each release with the premium it went on to command.
 
 #### Notes
 
-The sales data is the **StockX 2019 dataset**, so figures reflect that era and
-catalog. Without the dataset/database the app falls back to synthetic stub data.
-Predictive modeling is a deliberate next-phase extension, not part of this build.
+The sales are the StockX 2019 dataset, so the figures reflect that era and its
+Off-White / Yeezy heavy catalog. Without the dataset or a database connection,
+the app falls back to synthetic stub data. Forecasting resale premium is the
+deliberate next phase, not part of this build.
 """
     )
 
 
 def _fmt_pct(value: float | None) -> str:
     """Format a fractional premium as a percentage, tolerating NaN/None."""
-    return "—" if value is None or pd.isna(value) else f"{value:.0%}"
+    return "n/a" if value is None or pd.isna(value) else f"{value:.0%}"
 
 
 PAGES = {
@@ -324,8 +327,8 @@ def main() -> None:
 
     st.title("Sneaker Resale Intelligence")
     st.caption(
-        "Resale premiums and search demand across the sneaker market — "
-        "an end-to-end data engineering project."
+        "Resale premiums and search demand across the sneaker market. "
+        "An end-to-end data engineering project."
     )
     st.divider()
 

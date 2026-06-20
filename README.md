@@ -1,16 +1,16 @@
 # sneaker-intel
 
-**Sneaker Resale Intelligence Platform** — an end-to-end data engineering project that ingests sneaker resale and demand signals, models them in a warehouse, transforms them with dbt, and surfaces them in a dashboard.
+**Sneaker Resale Intelligence Platform.** An end-to-end data engineering project that ingests sneaker resale and demand signals, models them in a warehouse, transforms them with dbt, and surfaces them in a dashboard.
 
-This is a personal portfolio project, built in public. Every phase is documented through Conventional Commits and a running [DEVLOG](DEVLOG.md). Predictive modeling / ML is a deliberate **Phase 2** extension and is intentionally out of scope for this build — the focus here is the data engineering foundation.
+Resale price behavior is hard to reason about from screenshots: why deadstock trades at multiples of retail, how a premium decays after a drop, why two colorways of the same silhouette diverge. This project puts the data in one place so those questions are answerable. It's a personal portfolio project, built in public, with every phase documented through Conventional Commits and a running [DEVLOG](DEVLOG.md). Forecasting resale premium is a deliberate Phase 2 extension and is intentionally out of scope here; this build is the data engineering foundation underneath it.
 
-**Live demo:** _not yet deployed — see [DEPLOY.md](DEPLOY.md)._ &nbsp;·&nbsp; **CI:** GitHub Actions runs the full pipeline (ingest → load → dbt build + tests) on every push.
+**Live demo:** not yet deployed (see [DEPLOY.md](DEPLOY.md)). &nbsp;·&nbsp; **CI:** GitHub Actions runs the full pipeline (ingest, load, dbt build and tests) on every push.
 
 ## Tech stack
 
 | Layer | Tooling |
 |---|---|
-| Ingestion | Python (dataclasses, type hints), `requests`, `praw`, `pytrends` |
+| Ingestion | Python (dataclasses, type hints): StockX CSV + `pytrends` (current); `requests`/`praw` clients (future) |
 | Storage | PostgreSQL (hand-written star schema, no ORM), `psycopg2` |
 | Transformation | dbt-core + dbt-postgres (staging / intermediate / marts) |
 | Dashboard | Streamlit + pandas + SQLAlchemy |
@@ -20,7 +20,7 @@ This is a personal portfolio project, built in public. Every phase is documented
 
 ```mermaid
 flowchart TD
-    A["Sources<br/>eBay · Reddit · Google Trends"] -->|ingestion/| B["Raw JSON<br/>data/raw/"]
+    A["Sources<br/>StockX dataset (sales) · Google Trends (demand)<br/><i>eBay · Reddit (future)</i>"] -->|ingestion/| B["Raw JSON<br/>data/raw/"]
     B -->|db/load_raw.py · execute_values| C[("PostgreSQL<br/>star schema")]
     C -->|dbt staging| D["stg_* views"]
     D -->|dbt intermediate| E["int_sales_enriched<br/>premium economics"]
@@ -30,12 +30,12 @@ flowchart TD
 
 ## Progress
 
-- [x] **Phase 0** — Project scaffold
-- [x] **Phase 1** — Python ingestion layer (eBay / Reddit / Google Trends)
-- [x] **Phase 2** — Database schema + raw loader (Postgres star schema)
-- [x] **Phase 3** — dbt transformation layer (staging / intermediate / marts + tests)
-- [x] **Phase 4** — Streamlit dashboard (Market Overview / Shoe Deep Dive / Drop Calendar)
-- [x] **Phase 5** — Deployment & polish (Docker, Makefile, CI, deploy guide, README finalize)
+- [x] **Phase 0**: Project scaffold
+- [x] **Phase 1**: Python ingestion layer (eBay / Reddit / Google Trends)
+- [x] **Phase 2**: Database schema + raw loader (Postgres star schema)
+- [x] **Phase 3**: dbt transformation layer (staging / intermediate / marts + tests)
+- [x] **Phase 4**: Streamlit dashboard (Market Overview / Shoe Deep Dive / Drop Calendar)
+- [x] **Phase 5**: Deployment & polish (Docker, Makefile, CI, deploy guide, README finalize)
 
 ## Run locally
 
@@ -62,22 +62,44 @@ make dashboard    # Streamlit at http://localhost:8501
 
 Run `make help` for all targets. To deploy a live instance, see [DEPLOY.md](DEPLOY.md).
 
-## API credentials
+## Data sources
 
-Ingestion runs out of the box in **stub mode** — each source yields synthetic
-records so the pipeline is testable before any keys exist. To pull real data,
-copy `.env.example` to `.env` and fill in the keys below. Any client whose keys
-are missing automatically falls back to stub mode (logged as a warning).
+The current pipeline has **two sources**, both real and key-free:
 
-| Source | What to register | Where | Env vars |
+| Source | Role | Key needed | Notes |
 |---|---|---|---|
-| eBay | Join the eBay Developer Program, create an app, and use its production **App ID (Client ID)** keyset for the Finding API. | https://developer.ebay.com/ | `EBAY_APP_ID` |
-| Reddit | Create a **script**-type app to get a client ID + secret. | https://www.reddit.com/prefs/apps | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` |
-| Google Trends | No key required (pytrends scrapes the public endpoint). | — | — |
+| **StockX dataset** (Kaggle) | Real resale sales; the backbone of `fact_sales`, and the loader derives `dim_drops` from it | No (CSV download) | Real Off-White / Yeezy sales: price, retail, release date, size, region |
+| **Google Trends** (`pytrends`) | Live search-demand signal per shoe → `fact_search_interest`, shown on the dashboard | No | Public endpoint, no registration |
 
-> Note: eBay is steering new integrations toward the **Browse API**; the Finding
-> API still serves sold-listing data but may need migration later. `.env` is
-> gitignored — never commit real keys.
+Everything runs out of the box in **stub mode** (deterministic synthetic
+records) so the pipeline, tests, and CI work before you download anything.
+
+### StockX dataset
+
+Download `StockX-Data-Contest.csv` from
+[Kaggle](https://www.kaggle.com/datasets/hudsonstuck/stockx-data-contest) and
+drop it at `data/external/StockX-Data-Contest.csv` (gitignored), or point
+`STOCKX_CSV_PATH` elsewhere. It ingests **every shoe in the dataset**, and its
+top-N most-sold shoes become the **watchlist** Google Trends queries, so search
+demand joins to the same `dim_shoes` rows as sales. Tune N with
+`SNEAKER_INTEL_WATCHLIST_SIZE` (default 15); without the CSV, a curated default
+watchlist is used.
+
+## Roadmap / future extensions
+
+These are implemented in the repo (`ingestion/ebay.py`, `ingestion/reddit.py`)
+with the same client pattern and tests, and the schema/loader already support
+them. They're parked as future work because they require API keys. Enabling
+them is additive (add the source back to `run_ingestion`):
+
+| Source | What it adds | What to register | Env vars |
+|---|---|---|---|
+| eBay (Finding API) | Live sold listings → `fact_sales` (multi-source) | eBay Developer Program **App ID** at https://developer.ebay.com/ | `EBAY_APP_ID` |
+| Reddit (`praw`) | Post-level social engagement → `fact_social_posts` | A **script** app at https://www.reddit.com/prefs/apps | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` |
+
+A further extension, the deliberately deferred **Phase 2 ML** work, would
+forecast resale premium from the sales, social, and search features this
+warehouse already models.
 
 ## Repo layout
 
@@ -98,34 +120,38 @@ sneaker-intel/
 ## Decisions & tradeoffs
 
 **Star schema, hand-written, no ORM.** The warehouse is read-heavy and
-analytical, so a star schema (conformed `dim_shoes` + per-source facts) keeps
-analytical queries to a single dimension join and matches what dbt and BI tools
-expect. Writing the DDL by hand keeps the constraints and indexes explicit and
-interview-explainable. See [docs/erd.md](docs/erd.md).
+analytical (average premium per shoe, demand versus sale volume, which
+silhouettes hold value), so a star schema with a conformed `dim_shoes` and
+per-source facts keeps those queries to a single dimension join, and it's the
+shape dbt and BI tools expect. Writing the DDL by hand keeps the constraints and
+indexes explicit and easy to talk through. See [docs/erd.md](docs/erd.md).
 
-**Two social fact tables instead of one.** Reddit is per-post and Google Trends
-is per-day — different grains. Splitting them (`fact_social_posts`,
-`fact_search_interest`) keeps every row meaningful rather than unioning
-mismatched grains behind a wall of NULLs.
+**Two social fact tables instead of one.** A Reddit post is one event; Google
+Trends is one row per day. Different grains. Splitting them into
+`fact_social_posts` and `fact_search_interest` keeps every row meaningful
+instead of unioning mismatched grains behind a wall of nulls.
 
 **Idempotency in the schema, not the loader.** Each fact carries a natural-key
 unique constraint and the loader inserts `ON CONFLICT DO NOTHING`, so re-running
-ingestion is a safe no-op — the property you want before automating it.
+ingestion is a safe no-op. Resale pulls overlap constantly (the same sold
+listing lands in two windows), so this is the property you want before
+automating anything.
 
 **Window functions over correlated subqueries.** The price-trajectory mart uses
-`AVG() OVER` (rolling 7-day premium), `RANK() OVER`, and `LAG()`. These compute
-in a single pass over each shoe's partition, where the subquery equivalents
-would re-scan per row — clearer and faster.
+`AVG() OVER` for the rolling 7-day premium, `RANK() OVER`, and `LAG()`. They
+compute in a single pass over each shoe's partition, where the subquery versions
+would re-scan per row. Premium decay after a drop only shows up if you can read
+each sale against the ones around it, which is exactly what these give you.
 
 **A thin dashboard.** Every figure the Streamlit app shows is a query against a
-dbt mart, not pandas transformation. Modeling logic stays in dbt where it's
-tested; the app only queries and presents.
+dbt mart, not pandas transformation. Modeling stays in dbt where it's tested;
+the app queries and presents.
 
 **Stub mode by default.** Sources without credentials yield deterministic
-synthetic records, so the whole pipeline (and the test suite, and CI) runs end
-to end before any API keys exist.
+synthetic records, so the whole pipeline, the test suite, and CI all run end to
+end before any API keys exist.
 
-**Why no ML yet.** Predictive modeling is a deliberate Phase 2 extension. This
-build is scoped to the data engineering foundation — reliable ingestion, a clean
-modeled warehouse, tests, and a dashboard — which is the prerequisite any
-forecasting work would sit on top of.
+**Why no ML yet.** Forecasting resale premium is the obvious place to want to
+go, and it's the planned Phase 2. But a forecast is only as good as the
+warehouse under it. This build is the foundation: reliable ingestion, a clean
+modeled warehouse, tests, and a dashboard.

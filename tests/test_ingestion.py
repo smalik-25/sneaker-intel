@@ -67,13 +67,38 @@ def test_write_raw_roundtrips(tmp_path) -> None:
     assert isinstance(payload["records"][0]["sold_date"], str)
 
 
-def test_run_writes_three_files_per_term(tmp_path) -> None:
+def test_run_writes_trends_per_term_plus_stockx(tmp_path) -> None:
     settings = Settings(
         watchlist=["Air Jordan 1", "Yeezy 350"],
         subreddits=["sneakers"],
         raw_dir=tmp_path,
-        # No credentials -> eBay & Reddit auto-stub.
     )
     written = run(settings, stub_trends=True)
-    assert len(written) == 2 * 3  # 2 terms x (ebay, reddit, trends)
+    # Current pipeline: 1 Trends file per term + 1 StockX dataset file.
+    assert len(written) == 2 + 1
     assert all(p.exists() for p in written)
+    # eBay/Reddit are future extensions, not produced by the default run.
+    assert not list(tmp_path.glob("ebay_*.json"))
+    assert not list(tmp_path.glob("reddit_*.json"))
+
+
+def test_run_derives_watchlist_from_real_stockx_csv(tmp_path) -> None:
+    csv = tmp_path / "stockx.csv"
+    csv.write_text(
+        "Order Date,Brand,Sneaker Name,Sale Price,Retail Price,"
+        "Release Date,Shoe Size,Buyer Region\n"
+        "9/1/2017,Yeezy,Adidas-Yeezy-Boost-350-Zebra,500,220,2/25/2017,10,California\n"
+        "9/2/2017,Off-White,Nike-Air-Presto-Off-White,800,160,8/3/2018,9,Texas\n",
+        encoding="utf-8",
+    )
+    settings = Settings(
+        watchlist=["Should Not Be Used"],
+        subreddits=["sneakers"],
+        raw_dir=tmp_path,
+        stockx_csv_path=csv,
+    )
+    run(settings, stub_trends=True)
+    # Trends files should be named for the StockX-derived shoes, not the curated term.
+    trends_files = sorted(p.name for p in tmp_path.glob("trends_*.json"))
+    assert any("yeezy" in f for f in trends_files)
+    assert not any("should-not-be-used" in f for f in trends_files)
