@@ -50,6 +50,109 @@ MART_SCHEMA = _setting("DBT_PG_SCHEMA", "analytics")
 RAW_SCHEMA = "public"
 
 
+# Faint hauntological grain overlay (fractal noise), screen-blended on the void.
+_GRAIN = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E"
+    "%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E"
+    "%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"
+)
+
+_BRAND_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,400..700;1,400..600&family=Space+Grotesk:wght@300..700&family=IBM+Plex+Mono:wght@400..600&display=swap');
+
+:root {
+  --void:#0b0b0f; --pitch:#060608; --slab:#131318; --slab-2:#1b1b22;
+  --hairline:#26262e; --hairline-2:#34343e;
+  --bone:#ece7d8; --bone-dim:#b6b1a4; --ash:#847f74;
+  --phosphor:#c8f24a; --oxblood:#8e1c24;
+}
+
+.stApp { background-color: var(--void); }
+html, body, .stApp, p, span, div, label, li, [class*="st-"] {
+  font-family: 'Space Grotesk', sans-serif;
+  color: var(--bone-dim);
+}
+h1, h2, h3, h4, h5 {
+  font-family: 'Cormorant', serif !important;
+  font-weight: 600; letter-spacing: -0.02em; color: var(--bone) !important;
+}
+h3 { font-size: 1.5rem !important; }
+a, a:visited { color: var(--phosphor); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Mono brand marks */
+.sm-eyebrow {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ash); margin-bottom: .35rem;
+}
+.sm-title {
+  font-family: 'Cormorant', serif; font-weight: 600; font-size: 3.4rem; line-height: 1.0;
+  letter-spacing: -0.02em; color: var(--bone); margin: 0 0 .3rem;
+}
+.sm-section-title {
+  font-family: 'Cormorant', serif; font-weight: 600; font-size: 2rem; line-height: 1.05;
+  letter-spacing: -0.02em; color: var(--bone); margin: .2rem 0 .3rem;
+}
+.sm-sub { font-family: 'Space Grotesk', sans-serif; color: var(--bone-dim); font-size: 1rem; }
+.sm-rule { border: 0; border-top: 1px solid var(--hairline); margin: 1rem 0 1.6rem; }
+
+/* DataField-style metrics */
+[data-testid="stMetric"] {
+  background: var(--slab); border: 1px solid var(--hairline); border-radius: 0; padding: 14px 16px;
+}
+[data-testid="stMetricLabel"] p {
+  font-family: 'IBM Plex Mono', monospace !important; text-transform: uppercase;
+  letter-spacing: .12em; font-size: 11px !important; color: var(--ash) !important;
+}
+[data-testid="stMetricValue"] {
+  font-family: 'Cormorant', serif !important; color: var(--bone) !important; font-weight: 600;
+}
+
+/* Hard gothic edges + hairlines */
+.stButton > button, [data-baseweb="input"], [data-baseweb="select"] > div,
+.stDataFrame, [data-testid="stTable"] { border-radius: 0 !important; }
+.stButton > button {
+  font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .1em;
+  border: 1px solid var(--hairline-2); color: var(--bone);
+}
+.stDataFrame thead tr th {
+  font-family: 'IBM Plex Mono', monospace !important; text-transform: uppercase;
+  letter-spacing: .08em; font-size: 11px !important; color: var(--ash) !important;
+}
+
+section[data-testid="stSidebar"] {
+  background: var(--pitch); border-right: 1px solid var(--hairline);
+}
+
+/* Grain overlay (restrained) */
+.stApp::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  opacity: .035; mix-blend-mode: screen; background-image: url("%GRAIN%");
+}
+</style>
+""".replace("%GRAIN%", _GRAIN)
+
+
+def _inject_brand_styles() -> None:
+    """Apply the Sam Malik 'Two Currents' design system to the Streamlit app."""
+    st.markdown(_BRAND_CSS, unsafe_allow_html=True)
+
+
+def _section(index: str, title: str, caption: str | None = None) -> None:
+    """Render a brand section header: mono eyebrow + gothic-serif title + optional caption."""
+    st.markdown(
+        f'<div class="sm-eyebrow">&sect; {index} &middot; {title.upper()}</div>'
+        f'<div class="sm-section-title">{title}</div>',
+        unsafe_allow_html=True,
+    )
+    if caption:
+        st.markdown(
+            f'<div class="sm-sub" style="margin-bottom:.6rem">{caption}</div>',
+            unsafe_allow_html=True,
+        )
+
+
 @st.cache_resource
 def get_engine() -> Engine:
     """Build a cached SQLAlchemy engine from DATABASE_URL.
@@ -81,8 +184,7 @@ def run_query(sql: str, params: dict | None = None) -> pd.DataFrame:
 # Page 1: Market Overview
 # ---------------------------------------------------------------------------
 def market_overview() -> None:
-    st.header("Market Overview")
-    st.caption("Resale premium = (sold price − retail) / retail.")
+    _section("0.1", "Market Overview", "Resale premium = (sold price − retail) / retail.")
 
     kpis = run_query(
         f"""
@@ -161,7 +263,7 @@ def market_overview() -> None:
 # Page 2: Shoe Deep Dive
 # ---------------------------------------------------------------------------
 def shoe_deep_dive() -> None:
-    st.header("Shoe Deep Dive")
+    _section("0.2", "Shoe Deep Dive", "Premium trajectory, size curve, and search demand per shoe.")
 
     shoes = run_query(
         f"select distinct search_term from {MART_SCHEMA}.mart_shoe_performance "
@@ -243,8 +345,7 @@ def shoe_deep_dive() -> None:
 # Page 3: Drop Calendar
 # ---------------------------------------------------------------------------
 def drop_calendar() -> None:
-    st.header("Drop Calendar")
-    st.caption("Release history with each shoe's resale-premium context.")
+    _section("0.3", "Drop Calendar", "Release history with each shoe's resale-premium context.")
 
     drops = run_query(
         f"""
@@ -287,7 +388,7 @@ def drop_calendar() -> None:
 # Page 4: About
 # ---------------------------------------------------------------------------
 def about() -> None:
-    st.header("About this project")
+    _section("0.4", "About", "What this is and how it's built.")
     st.markdown(
         """
 I built **Sneaker Resale Intelligence** because resale price behavior is hard to
@@ -347,16 +448,25 @@ PAGES = {
 
 def main() -> None:
     st.set_page_config(page_title="Sneaker Resale Intelligence", layout="wide")
+    _inject_brand_styles()
 
-    st.title("Sneaker Resale Intelligence")
-    st.caption(
-        "Resale premiums and search demand across the sneaker market. "
-        "An end-to-end data engineering project."
+    st.markdown(
+        '<div class="sm-eyebrow">0.0 &middot; SNEAKER RESALE INTELLIGENCE '
+        '&middot; DATA PIPELINE</div>'
+        '<div class="sm-title">Sneaker Resale Intelligence</div>'
+        '<div class="sm-sub">Resale premiums and search demand across the sneaker market '
+        '&middot; an end-to-end data engineering project</div>'
+        '<hr class="sm-rule"/>',
+        unsafe_allow_html=True,
     )
-    st.divider()
 
-    st.sidebar.title("sneaker-intel")
-    st.sidebar.caption("Resale Intelligence Platform")
+    st.sidebar.markdown(
+        '<div class="sm-eyebrow">SAM&middot;MALIK &middot; DATA</div>'
+        '<div style="font-family:Cormorant,serif;font-weight:600;font-size:1.7rem;'
+        'color:#ece7d8;line-height:1;margin-bottom:.2rem">sneaker&middot;intel</div>'
+        '<div class="sm-eyebrow" style="color:#555049">Resale Intelligence Platform</div>',
+        unsafe_allow_html=True,
+    )
     choice = st.sidebar.radio("Page", list(PAGES))
     PAGES[choice]()
 
