@@ -52,7 +52,14 @@ RAW_SCHEMA = "public"
 
 @st.cache_resource
 def get_engine() -> Engine:
-    """Build a cached SQLAlchemy engine from DATABASE_URL."""
+    """Build a cached SQLAlchemy engine from DATABASE_URL.
+
+    pool_pre_ping checks a pooled connection is alive before using it (and
+    reconnects if not), and pool_recycle drops connections older than 5 minutes.
+    Together these handle serverless Postgres (e.g. Neon) auto-suspending while
+    the cached engine is idle, which otherwise errors on the first query after a
+    cold start.
+    """
     dsn = _setting("DATABASE_URL")
     if not dsn:
         st.error(
@@ -60,7 +67,7 @@ def get_engine() -> Engine:
             "the database is running and loaded)."
         )
         st.stop()
-    return create_engine(dsn)
+    return create_engine(dsn, pool_pre_ping=True, pool_recycle=300)
 
 
 @st.cache_data(ttl=300)
