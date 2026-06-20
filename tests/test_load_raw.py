@@ -16,6 +16,7 @@ from ingestion.run_ingestion import run
 _EBAY_PER_TERM = 12
 _REDDIT_PER_TERM = 15
 _TRENDS_PER_TERM = 13
+_STOCKX_STUB_ROWS = 40  # StockXClient stub default (run() calls fetch_sales())
 
 
 class FakeCursor:
@@ -80,11 +81,14 @@ def test_load_all_inserts_every_record(tmp_path, monkeypatch) -> None:
     _patch_db(monkeypatch)
     inserted = lr.load_all("postgresql://fake", raw_dir=tmp_path)
 
-    assert inserted == {
-        "fact_sales": _EBAY_PER_TERM * 2,
-        "fact_social_posts": _REDDIT_PER_TERM * 2,
-        "fact_search_interest": _TRENDS_PER_TERM * 2,
-    }
+    # Current pipeline produces Trends + StockX only; eBay/Reddit are future
+    # extensions, so their fact loads are present-but-empty.
+    assert inserted["fact_search_interest"] == _TRENDS_PER_TERM * 2
+    assert inserted["fact_sales_stockx"] == _STOCKX_STUB_ROWS
+    assert inserted["fact_sales_ebay"] == 0
+    assert inserted["fact_social_posts"] == 0
+    # StockX stub spans 4 distinct shoes, each with one release date.
+    assert inserted["dim_drops"] == 4
 
 
 def test_load_all_builds_correct_row_widths(tmp_path, monkeypatch) -> None:
@@ -102,15 +106,21 @@ def test_load_all_builds_correct_row_widths(tmp_path, monkeypatch) -> None:
             widths["posts"] = len(rows[0])
         elif "fact_search_interest" in sql:
             widths["interest"] = len(rows[0])
+        elif "dim_drops" in sql:
+            widths["drops"] = len(rows[0])
+    # Current run inserts StockX sales, Trends interest, and derived drops.
     # Column counts must match the INSERT column lists.
-    assert widths == {"sales": 8, "posts": 7, "interest": 4}
+    assert widths == {"sales": 9, "interest": 4, "drops": 4}
 
 
 def test_load_all_handles_empty_raw_dir(tmp_path, monkeypatch) -> None:
     _patch_db(monkeypatch)
     inserted = lr.load_all("postgresql://fake", raw_dir=tmp_path)
-    assert inserted == {
-        "fact_sales": 0,
-        "fact_social_posts": 0,
-        "fact_search_interest": 0,
+    assert set(inserted) == {
+        "dim_drops",
+        "fact_sales_ebay",
+        "fact_sales_stockx",
+        "fact_social_posts",
+        "fact_search_interest",
     }
+    assert all(v == 0 for v in inserted.values())

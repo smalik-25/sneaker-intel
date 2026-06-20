@@ -7,6 +7,7 @@ with source as (
 select
     sale_key,
     shoe_key,
+    source,
     source_item_id,
     title,
     sold_price,

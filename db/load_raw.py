@@ -75,6 +75,7 @@ def load_sales(cur, records: list[dict[str, Any]], shoe_map: dict[str, int]) -> 
     rows = [
         (
             shoe_map[r["search_term"]],
+            "ebay",
             r["source_item_id"],
             r["title"],
             r["sold_price"],
@@ -85,13 +86,65 @@ def load_sales(cur, records: list[dict[str, Any]], shoe_map: dict[str, int]) -> 
         )
         for r in records
     ]
+    return _insert_sales(cur, rows)
+
+
+def load_stockx_sales(
+    cur, records: list[dict[str, Any]], shoe_map: dict[str, int]
+) -> int:
+    """Bulk-insert StockX sales into fact_sales; return the number of new rows."""
+    rows = [
+        (
+            shoe_map[r["search_term"]],
+            "stockx",
+            r["source_item_id"],
+            r["title"],
+            r["sold_price"],
+            "USD",
+            r["sold_date"],
+            "New",  # StockX sells deadstock.
+            r["size"],
+        )
+        for r in records
+    ]
+    return _insert_sales(cur, rows)
+
+
+def _insert_sales(cur, rows: list[tuple]) -> int:
+    """Shared fact_sales insert for any source."""
     if not rows:
         return 0
     execute_values(
         cur,
         "insert into fact_sales "
-        "(shoe_key, source_item_id, title, sold_price, currency, sold_date, "
-        "condition, size) values %s on conflict (source_item_id) do nothing",
+        "(shoe_key, source, source_item_id, title, sold_price, currency, "
+        "sold_date, condition, size) values %s "
+        "on conflict (source_item_id) do nothing",
+        rows,
+    )
+    return cur.rowcount
+
+
+def load_drops(cur, records: list[dict[str, Any]], shoe_map: dict[str, int]) -> int:
+    """Derive dim_drops from StockX records (release_date + retail_price).
+
+    Deduplicates to one row per (shoe, release_date) before inserting.
+    """
+    seen: dict[tuple[int, str], tuple] = {}
+    for r in records:
+        release = r.get("release_date")
+        retail = r.get("retail_price")
+        if not release or retail is None:
+            continue
+        key = (shoe_map[r["search_term"]], release)
+        seen.setdefault(key, (key[0], release, retail, "general"))
+    rows = list(seen.values())
+    if not rows:
+        return 0
+    execute_values(
+        cur,
+        "insert into dim_drops (shoe_key, release_date, retail_price, release_type) "
+        "values %s on conflict (shoe_key, release_date) do nothing",
         rows,
     )
     return cur.rowcount
@@ -154,16 +207,20 @@ def load_all(dsn: str, raw_dir: Path = RAW_DIR) -> dict[str, int]:
     sales = _read_source(raw_dir, "ebay")
     posts = _read_source(raw_dir, "reddit")
     interest = _read_source(raw_dir, "trends")
+    stockx = _read_source(raw_dir, "stockx")
 
     search_terms = {
-        r["search_term"] for batch in (sales, posts, interest) for r in batch
+        r["search_term"] for batch in (sales, posts, interest, stockx) for r in batch
     }
 
     inserted: dict[str, int] = {}
     with psycopg2.connect(dsn) as conn:
         with conn.cursor() as cur:
             shoe_map = upsert_shoes(cur, search_terms)
-            inserted["fact_sales"] = load_sales(cur, sales, shoe_map)
+            # dim_drops first (StockX-derived) so premium joins have releases.
+            inserted["dim_drops"] = load_drops(cur, stockx, shoe_map)
+            inserted["fact_sales_ebay"] = load_sales(cur, sales, shoe_map)
+            inserted["fact_sales_stockx"] = load_stockx_sales(cur, stockx, shoe_map)
             inserted["fact_social_posts"] = load_social_posts(cur, posts, shoe_map)
             inserted["fact_search_interest"] = load_search_interest(
                 cur, interest, shoe_map

@@ -22,6 +22,7 @@ primary_drop as (
 select
     s.sale_key,
     s.shoe_key,
+    s.source,
     sh.search_term,
     sh.brand,
     sh.silhouette,

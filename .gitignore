@@ -21,6 +21,10 @@ secrets.toml
 data/raw/*
 !data/raw/.gitkeep
 
+# External datasets (e.g. the Kaggle StockX CSV — download locally, not versioned)
+data/external/*
+!data/external/.gitkeep
+
 # dbt
 dbt_project/target/
 dbt_project/dbt_packages/

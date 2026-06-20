@@ -36,3 +36,19 @@ models:
       - name: premium_rank_in_shoe
         description: "1 = highest premium sale for the shoe."
         data_tests: [not_null]
+
+  - name: mart_search_interest
+    description: >
+      Google Trends search interest per shoe over time (one row per shoe-day).
+      Answers "how does search demand for a shoe move over time?"
+    columns:
+      - name: shoe_key
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_shoes')
+              field: shoe_key
+      - name: point_date
+        data_tests: [not_null]
+      - name: interest
+        data_tests: [not_null]

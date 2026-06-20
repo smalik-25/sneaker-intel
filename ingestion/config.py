@@ -23,6 +23,7 @@ except ImportError:  # dotenv is optional; real env vars still work without it.
 # Project root is the parent of the ingestion package.
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 RAW_DIR: Path = PROJECT_ROOT / "data" / "raw"
+STOCKX_CSV: Path = PROJECT_ROOT / "data" / "external" / "StockX-Data-Contest.csv"
 
 # Default models to track. Override with the SNEAKER_INTEL_WATCHLIST env var
 # (comma-separated) without touching code.
@@ -52,6 +53,10 @@ class Settings:
     watchlist: list[str] = field(default_factory=lambda: list(DEFAULT_WATCHLIST))
     subreddits: list[str] = field(default_factory=lambda: list(DEFAULT_SUBREDDITS))
     raw_dir: Path = RAW_DIR
+    stockx_csv_path: Path = STOCKX_CSV
+    # When the real StockX CSV is present, the live-source watchlist is derived
+    # from its top-N most-sold shoes (capped here) instead of DEFAULT_WATCHLIST.
+    watchlist_size: int = 15
 
     # Credentials (None when unset -> the client runs in stub mode).
     ebay_app_id: str | None = None
@@ -65,6 +70,8 @@ class Settings:
         return cls(
             watchlist=_split_env("SNEAKER_INTEL_WATCHLIST", DEFAULT_WATCHLIST),
             subreddits=_split_env("SNEAKER_INTEL_SUBREDDITS", DEFAULT_SUBREDDITS),
+            stockx_csv_path=Path(os.getenv("STOCKX_CSV_PATH", str(STOCKX_CSV))),
+            watchlist_size=int(os.getenv("SNEAKER_INTEL_WATCHLIST_SIZE", "15")),
             ebay_app_id=os.getenv("EBAY_APP_ID"),
             reddit_client_id=os.getenv("REDDIT_CLIENT_ID"),
             reddit_client_secret=os.getenv("REDDIT_CLIENT_SECRET"),

@@ -11,12 +11,14 @@
 -- enrichment exists. Re-running the loader is idempotent: every fact has a
 -- natural-key unique constraint and the loader inserts ON CONFLICT DO NOTHING.
 
--- Idempotent (re)creation for local dev. Order matters: drop facts first.
-drop table if exists fact_search_interest;
-drop table if exists fact_social_posts;
-drop table if exists fact_sales;
-drop table if exists dim_drops;
-drop table if exists dim_shoes;
+-- Idempotent (re)creation for local dev. CASCADE also clears any dbt views
+-- (analytics.stg_*) built on top of these tables; rebuild them with
+-- `make transform`.
+drop table if exists fact_search_interest cascade;
+drop table if exists fact_social_posts cascade;
+drop table if exists fact_sales cascade;
+drop table if exists dim_drops cascade;
+drop table if exists dim_shoes cascade;
 
 -- ---------------------------------------------------------------------------
 -- Dimensions
@@ -53,11 +55,13 @@ create table dim_drops (
 -- Facts
 -- ---------------------------------------------------------------------------
 
--- One row per sold eBay listing. source_item_id is unique so repeated
--- ingestion of the same listing never double-counts a sale.
+-- One row per sold listing, across sources (eBay, StockX). source_item_id is
+-- unique so repeated ingestion of the same sale never double-counts, and the
+-- `source` column records provenance.
 create table fact_sales (
     sale_key        bigserial primary key,
     shoe_key        integer not null references dim_shoes (shoe_key),
+    source          text not null default 'ebay',
     source_item_id  text not null unique,
     title           text,
     sold_price      numeric(10, 2) not null check (sold_price >= 0),
@@ -70,6 +74,7 @@ create table fact_sales (
 
 create index ix_fact_sales_shoe on fact_sales (shoe_key);
 create index ix_fact_sales_sold_date on fact_sales (sold_date);
+create index ix_fact_sales_source on fact_sales (source);
 
 -- One row per Reddit post matching a tracked shoe. source_post_id deduplicates.
 create table fact_social_posts (
